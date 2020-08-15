@@ -1,60 +1,81 @@
+# Import All Dependencies
+from bs4 import BeautifulSoup as bs
+import requests
+import os
+import pymongo
+import time
 from splinter import Browser
-from bs4 import BeautifulSoup
-
-
-def init_browser():
-    # @NOTE: Replace the path with your actual path to the chromedriver
-    executable_path = {"executable_path": "/usr/local/bin/chromedriver"}
-    return Browser("chrome", **executable_path, headless=False)
+import pandas as pd
 
 
 def scrape():
-    browser = init_browser()
-    # create surf_data dict that we can insert into mongo
-    surf_data = {}
-
-    # visit unsplash.com
-    unsplash = "https://unsplash.com/search/photos/surfing"
-    browser.visit(unsplash)
-    browser.is_element_present_by_id("gridMulti", 1)
+#Scraping for All Data
+# ### NASA Mars News
+    executable_path = {'executable_path': 'C:\\Users\\winyi\\OneDrive\\Desktop\\LearnPython\\chromedriver.exe'}
+    browser = Browser('chrome', **executable_path, headless=False)
+    url = "https://mars.nasa.gov/news"
+    browser.visit(url)
+    time.sleep(5)
     html = browser.html
+    soup = bs(html, 'lxml')
 
-    # create a soup object from the html
-    img_soup = BeautifulSoup(html, "html.parser")
-    elem = img_soup.find(id="gridMulti")
-    img_src = elem.find("img")["src"]
+    results = soup.find('div', class_='list_text')
+    news_title = results.a.text
+    teaser = soup.find('div', class_ ='article_teaser_body')
+    news_p = teaser.text
 
-    # add our src to surf data with a key of src
-    surf_data["src"] = img_src
+    
 
-    # visit surfline to get weather report
-    weather = (
-        "http://www.surfline.com/surf-forecasts/southern-california/santa-barbara_2141"
-    )
-    browser.visit(weather)
-
-    # grab our new html from surfline
-    browser.is_element_present_by_css(".sl-premium-analysis-link", 1)
-    analysis_url = browser.find_link_by_partial_href("premium-analysis").first["href"]
-    browser.visit(analysis_url)
-    browser.is_element_present_by_css(".sl-feed-article", 1)
-
-    # create soup object from html
+    # ### JPL Mars Space Images - Featured Image
+    url2 = "https://www.jpl.nasa.gov/spaceimages/?search=&category=featured#submit"
+    browser.visit(url2)
+    browser.click_link_by_partial_text("FULL")
+    browser.click_link_by_partial_text("more info")
+    time.sleep(5)
     html = browser.html
-    report = BeautifulSoup(html, "html.parser")
-    surf_report = report.find_all("p")
-    # add it to our surf data dict
-    surf_data["report"] = build_report(surf_report)
-    # return our surf data dict
+    soup2 = bs(html, 'lxml')
+    featured=soup2.find('figure', {'class':'lede'}).find('a')['href']
+    main_url = 'https://www.jpl.nasa.gov'
+    featured_image_url=main_url + featured
 
-    browser.quit()
-    return surf_data
+    # ### Mars Weather
+    url3 = 'https://twitter.com/marswxreport?lang=en'
+    browser.visit(url3)
+    time.sleep(5)
+    html3 = browser.html
+    soup3 = bs(html3, 'lxml')   
+    tweet = soup3.find('div', {'class':'css-901oao r-hkyrab r-1qd0xha r-a023e6 r-16dba41 r-ad9z0x r-bcqeeo r-bnwqim r-qvutc0'})    
+    mars_weather = tweet.text
+     
+
+    # ### Mars Facts
+    table = pd.read_html('https://space-facts.com/mars/')
+    df = table[0]
+    df.columns = ['description','value']
+    df.set_index('description', inplace=True)
+    html = df.to_html()
 
 
-# helper function to build surf report
-def build_report(surf_report):
-    final_report = ""
-    for p in surf_report:
-        final_report += " " + p.get_text()
-        print(final_report)
-    return final_report
+
+    # ### Mars Hemispheres
+    hemispheres=['Cerberus','Schiaparelli','Syrtis Major','Valles Marineris']
+    url4='https://astrogeology.usgs.gov/search/results?q=hemisphere+enhanced&k1=target&v1=Mars'
+    titles=[]
+    urls=[]
+    for x in hemispheres:
+        browser.visit(url4)
+        time.sleep(5)
+        browser.click_link_by_partial_text(x)
+        html4=browser.html
+        soup4=bs(html4,'lxml')
+        url=soup4.find('div',attrs={"class":"downloads"}).find('li').find('a')['href']
+        title = soup4.find('div',{'class':'content'}).h2.text
+        titles.append(title)
+        urls.append(url)
+    hemisphere_image_urls = [
+    {'title': titles[0], 'img_url':urls[0]},
+    {'title': titles[1], 'img_url':urls[1]},
+    {'title': titles[2], 'img_url':urls[2]},
+    {'title': titles[3], 'img_url':urls[3]}]    
+    
+
